@@ -49,6 +49,7 @@ pub struct AgonMachine {
     flash_addr_u: u8,
     cs0_lbr: u8,
     cs0_ubr: u8,
+    flash_enabled: bool,
     flash_waitstates: u8,
 
     gpio_vga: gpio_video::GpioVga,
@@ -241,6 +242,7 @@ impl Machine for AgonMachine {
             0xd7 => self.uart1.spr,
 
             0xf7 => self.flash_addr_u,
+            0xf8 => (self.flash_waitstates << 5) | (u8::from(self.flash_enabled) << 3),
 
             _ => {
                 //println!("IN({:02X})", address);
@@ -455,7 +457,10 @@ impl Machine for AgonMachine {
             0xd7 => self.uart1.spr = value,
 
             0xf7 => self.flash_addr_u = value,
-            0xf8 => self.flash_waitstates = value >> 5,
+            0xf8 => {
+                self.flash_waitstates = value >> 5;
+                self.flash_enabled = value & 0x08 != 0;
+            }
 
             _ => {
                 //println!("OUT(${:02X}) = ${:x}", address, value);
@@ -553,6 +558,7 @@ impl AgonMachine {
             flash_addr_u: 0,
             cs0_lbr: 0,
             cs0_ubr: 0xff,
+            flash_enabled: true,
             flash_waitstates: 4,
             interrupt_precision: config.interrupt_precision,
         }
@@ -583,6 +589,9 @@ impl AgonMachine {
 
     #[inline]
     fn get_rom_address(&self, address: u32) -> Option<u32> {
+        if !self.flash_enabled {
+            return None;
+        }
         let a: u32 = address.wrapping_sub((self.flash_addr_u as u32) << 16);
         if a < ROM_SIZE as u32 {
             Some(a)
@@ -1700,5 +1709,55 @@ impl AgonMachine {
                 .checked_add(std::time::Duration::from_millis(1))
                 .unwrap_or(std::time::Instant::now());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct NullSerialLink;
+
+    impl uart::SerialLink for NullSerialLink {
+        fn send(&mut self, _byte: u8) {}
+        fn recv(&mut self) -> Option<u8> {
+            None
+        }
+        fn read_clear_to_send(&mut self) -> bool {
+            false
+        }
+    }
+
+    fn test_machine() -> AgonMachine {
+        let (tx_gpio_vga_frame, _rx_gpio_vga_frame) = std::sync::mpsc::channel();
+        let atomic_bool = || Arc::new(std::sync::atomic::AtomicBool::new(false));
+        AgonMachine::new(AgonMachineConfig {
+            uart0_link: Box::new(NullSerialLink),
+            uart1_link: Box::new(NullSerialLink),
+            soft_reset: atomic_bool(),
+            emulator_shutdown: atomic_bool(),
+            exit_status: Arc::new(std::sync::atomic::AtomicI32::new(0)),
+            paused: atomic_bool(),
+            clockspeed_hz: 18_432_000,
+            ram_init: RamInit::Zero,
+            mos_bin: std::path::PathBuf::from("unused-mos.bin"),
+            gpios: Arc::new(gpio::GpioSet::new()),
+            tx_gpio_vga_frame,
+            interrupt_precision: 1,
+            external_ram_size: 512 * 1024,
+        })
+    }
+
+    #[test]
+    fn disabling_flash_exposes_mapped_external_ram() {
+        let mut machine = test_machine();
+        machine.port_out(0xa8, 0x01);
+        machine.port_out(0xa9, 0x08);
+
+        let flash_ctrl = machine.port_in(0xf8);
+        machine.port_out(0xf8, flash_ctrl & !0x08);
+
+        machine.poke(0x010000, b'M');
+        assert_eq!(machine.peek(0x010000), b'M');
     }
 }
