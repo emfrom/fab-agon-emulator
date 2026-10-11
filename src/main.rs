@@ -265,39 +265,39 @@ pub fn main_loop() -> i32 {
         None
     } else {
         (|| -> Result<AudioStreamSet, sdl3::Error> {
-        let audio_subsystem = sdl_context.audio()?;
-        let device = audio_subsystem.open_playback_device(&sdl3::audio::AudioSpec {
-            format: Some(sdl3::audio::AudioFormat::U8),
-            freq: Some(48000),
-            channels: Some(1),
-        })?;
-
-        let vdp_audiostream = audio_subsystem.open_playback_stream_with_callback(
-            &device,
-            &sdl3::audio::AudioSpec {
+            let audio_subsystem = sdl_context.audio()?;
+            let device = audio_subsystem.open_playback_device(&sdl3::audio::AudioSpec {
                 format: Some(sdl3::audio::AudioFormat::U8),
-                freq: Some(16384), // real VDP uses 16384Hz
+                freq: Some(48000),
                 channels: Some(1),
-            },
-            audio::VdpAudioStream {
-                buffer: vec![],
-                getAudioSamples: vdp_interface.getAudioSamples,
-            },
-        )?;
+            })?;
 
-        vdp_audiostream.resume()?;
+            let vdp_audiostream = audio_subsystem.open_playback_stream_with_callback(
+                &device,
+                &sdl3::audio::AudioSpec {
+                    format: Some(sdl3::audio::AudioFormat::U8),
+                    freq: Some(16384), // real VDP uses 16384Hz
+                    channels: Some(1),
+                },
+                audio::VdpAudioStream {
+                    buffer: vec![],
+                    getAudioSamples: vdp_interface.getAudioSamples,
+                },
+            )?;
 
-        let gpio_audiostream = device.open_device_stream(Some(&sdl3::audio::AudioSpec {
-            format: Some(sdl3::audio::AudioFormat::U8),
-            freq: Some(48000),
-            channels: Some(1),
-        }))?;
+            vdp_audiostream.resume()?;
 
-        Ok(AudioStreamSet {
-            vdp: vdp_audiostream,
-            gpio: gpio_audiostream,
-        })
-    })()
+            let gpio_audiostream = device.open_device_stream(Some(&sdl3::audio::AudioSpec {
+                format: Some(sdl3::audio::AudioFormat::U8),
+                freq: Some(48000),
+                channels: Some(1),
+            }))?;
+
+            Ok(AudioStreamSet {
+                vdp: vdp_audiostream,
+                gpio: gpio_audiostream,
+            })
+        })()
         .inspect_err(|e| {
             eprintln!("Error opening audio stream: {}", e);
         })
