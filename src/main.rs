@@ -261,7 +261,10 @@ pub fn main_loop() -> i32 {
         gpio: sdl3::audio::AudioStreamOwner,
     }
 
-    let audio_streams = (|| -> Result<AudioStreamSet, sdl3::Error> {
+    let audio_streams = if args.no_audio {
+        None
+    } else {
+        (|| -> Result<AudioStreamSet, sdl3::Error> {
         let audio_subsystem = sdl_context.audio()?;
         let device = audio_subsystem.open_playback_device(&sdl3::audio::AudioSpec {
             format: Some(sdl3::audio::AudioFormat::U8),
@@ -295,10 +298,11 @@ pub fn main_loop() -> i32 {
             gpio: gpio_audiostream,
         })
     })()
-    .inspect_err(|e| {
-        eprintln!("Error opening audio stream: {}", e);
-    })
-    .ok();
+        .inspect_err(|e| {
+            eprintln!("Error opening audio stream: {}", e);
+        })
+        .ok()
+    };
 
     // VDP thread
     let _vdp_thread = thread::Builder::new()

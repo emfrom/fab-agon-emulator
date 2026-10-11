@@ -15,6 +15,7 @@ OPTIONS:
   --firmware quark      Use quark 1.04 firmware (default is platform)
   -h, --help            Prints help information
   --mode <n>            Start in a specific screen mode
+  --no-audio            Disable VDP and GPIO audio output
   --mouse-accel <n>     Accelerate mouse by <n>x
   --osk                 Enable on-screen-keyboard input (requires OS osk)
   --ralt-hostkey        Use right-alt (AltGr) as the emulator host key
@@ -81,6 +82,7 @@ pub struct AppArgs {
     pub firmware: FirmwareVer,
     pub screen_scale: ScreenScale,
     pub renderer: Renderer,
+    pub no_audio: bool,
     pub border: u32,
     pub uart1_device: Option<String>,
     pub uart1_baud: Option<u32>,
@@ -136,6 +138,7 @@ pub fn parse_args() -> Result<AppArgs, pico_args::Error> {
         verbose: pargs.contains("--verbose"),
         zero: pargs.contains(["-z", "--zero"]),
         precise_interrupts: pargs.contains("--precise-interrupts"),
+        no_audio: pargs.contains("--no-audio"),
         osk: pargs.contains("--osk"),
         swap_caps_and_ctrl: pargs.contains("--swap-caps-and-ctrl"),
         scr_mode: pargs.opt_value_from_str("--mode")?,
