@@ -1465,7 +1465,7 @@ impl AgonMachine {
         // trapped mid-execution)
         self.last_pc = pc;
 
-        if self.enable_hostfs && pc < 0x20000 && self.flash_addr_u == 0 {
+        if self.enable_hostfs && self.flash_enabled && pc < 0x20000 && self.flash_addr_u == 0 {
             // Don't use any cycles in hostfs functionality.
             // Why? fread (for example) can write to thousands
             // of memory locations, causing cycle_counter to get
